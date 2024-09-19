@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://kit.fontawesome.com/391827d54c.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles.css">
+
+    <title>Whatsapp Clone</title>
+</head>
+<body>
+<div class="background-green"></div>
+
+<div class="main-container">
+    <div class="left-container">
+        <!--header -->
+        <div class="header">
+            <div class="user-img">
+                <img class="dp" src="https://www.codewithfaraz.com/InstaPic.png" alt="">
+            </div>
+            <div class="nav-icons">
+                <li><i class="fa-solid fa-users"></i></li>
+                <li><i class="fa-solid fa-message"></i></li>
+                <li><i class="fa-solid fa-ellipsis-vertical"></i></li>
+            </div>
+        </div>
+
+        <!--notification -->
+        <div class="notif-box">
+            <i class="fa-solid fa-bell-slash"></i>
+            <div class="notif-text">
+                <p>Get Notified of New Messages</p>
+                <a href="#">Turn on Desktop Notifications ›</a>
+            </div>
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+
+        <!--search-container -->
+        <div class="search-container">
+            <div class="input">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Search or start new chat   "></div>
+            <i class="fa-sharp fa-solid fa-bars-filter"></i>
+        </div>
+
+        <!--chats -->
+        <div class="chat-list">
+            <!--<div class="chat-box">
+                <div class="img-box">
+                    <img class="img-cover" src="https://lh5.googleusercontent.com/-7ssjf_mDE1Q/AAAAAAAAAAI/AAAAAAAAASo/tioYx2oklWEHoo5nAEyCT-KeLxYqE5PuQCLcDEAE/s100-c-k-no-mo/photo.jpg" alt="">
+                </div>
+                <div class="chat-details">
+                    <div id="chatGpt" class="text-head">
+                        <h4>ChatGPT</h4>
+                        <p id="afterchat" class="time unread"></p>
+                    </div>
+                    <div id="text-message" class="text-message">
+                    </div>
+                </div>
+            </div>-->
+        </div>
+    </div>
+
+    <div class="right-container">
+        <!--header -->
+        <div class="header">
+            <div class="img-text">
+                <div class="user-img">
+                    <img id="img-profile" class="dp" src="https://images.pexels.com/photos/2474307/pexels-photo-2474307.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1" alt="">
+                </div>
+
+                <div id="name-profile">
+                    <h4>ChatPGt<br><span>Online</span></h4>
+                </div>
+            </div>
+            <div class="nav-icons">
+                <li><i class="fa-solid fa-magnifying-glass"></i></li>
+                <li><i class="fa-solid fa-ellipsis-vertical"></i></li>
+            </div>
+        </div>
+
+        <!--chat-container -->
+        <div id="chat-container" class="chat-container">
+
+        </div>
+
+        <!--input-bottom -->
+        <div class="chatbox-input">
+            <i class="fa-regular fa-face-grin"></i>
+            <i class="fa-sharp fa-solid fa-paperclip"></i>
+            <input type="text" placeholder="Type a message">
+            <i class="fa-solid fa-microphone"></i>
+        </div>
+    </div>
+
+</div>
+<script>
+
+    const ws = new WebSocket('ws://localhost:8080'); // Ajusta la URL del WebSocket
+
+    ws.onmessage = (event) => {
+
+        const chatContainer = document.getElementById('chat-container');
+        const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop === chatContainer.clientHeight;
+
+        const newMessage = JSON.parse(event.data);
+        console.log(`Nuevo mensaje de ${newMessage.from}: ${newMessage.body}`);
+
+        // Llama a la función para añadir el mensaje al chat correspondiente
+        addMessageToChat(newMessage);
+        if (isAtBottom) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    };
+
+    function addMessageToChat(message) {
+        const chatList = document.querySelector('.chat-list');
+
+        // Buscar el chat-box que tiene el chat-id correspondiente
+        const chatBox = document.querySelector(`.chat-box[data-chat-id="${message.from}"]`);
+
+        if (chatBox) {
+            // Añadir el mensaje al contenedor de mensajes
+            const chatContainer = document.getElementById('chat-container');
+            const messageBox = document.createElement('div');
+
+            messageBox.className = message.fromMe ? 'message-box my-message' : 'message-box friend-message';
+            const messageContent = document.createElement('p');
+            messageContent.innerHTML = `${message.body}<br><span>${new Date(message.timestamp * 1000).toLocaleDateString()} ${new Date(message.timestamp * 1000).toLocaleTimeString()}</span>`;
+            messageBox.appendChild(messageContent);
+            chatContainer.appendChild(messageBox);
+
+            // Mover el chat a la parte superior de la lista de chats
+            chatList.prepend(chatBox);
+            chatBox.querySelector(".text-message").innerHTML =`<p>${truncateWords(message.body, 6)}</p>`
+
+            // Hacer foco en el nuevo mensaje
+            messageBox.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+
+    function truncateWords(text, maxWords) {
+        const words = text.split(' ');
+        if (words.length <= maxWords) {
+            return text;
+        }
+        return words.slice(0, maxWords).join(' ') + '...';
+    }
+
+    let offset = 0; // Para controlar cuántos chats hemos mostrado
+    const limit = 30; // Número de chats por lote
+    let chats = []; // Variable para almacenar todos los chats localmente
+
+    // Cargar los chats desde el backend y guardarlos en sessionStorage o en una variable local
+    async function loadInitialChats(charge=false) {
+        try {
+            const chatsList = chats;
+            const response = await fetch('http://localhost:3000/client/getChats/ABCD', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+            chats = data.chats.filter(x => x.id._serialized != "0@c.us" && !x.isGroup);
+
+            chats.map(chat => {
+                let chatl = chatsList.find(x => x.id._serialized == chat.id._serialized)
+                chat.profilePicData = chatl?.profilePicData;
+            });
+
+            // Guardar los chats en sessionStorage si prefieres usar sessionStorage
+            sessionStorage.setItem('chats', JSON.stringify(chats));
+
+            await loadChatsBatch(charge);
+
+        } catch (error) {
+            console.error('Error al cargar los chats:', error);
+        }
+    }
+
+    async function limitConcurrent(promises, limit) {
+        const results = [];
+        const executing = [];
+
+        for (const promise of promises) {
+            const p = promise().then(result => {
+                executing.splice(executing.indexOf(p), 1); // Remover la promesa cuando se complete
+                return result;
+            });
+            results.push(p);
+            executing.push(p);
+            // Si hemos alcanzado el límite, esperar hasta que una promesa se complete
+            if (executing.length >= limit) {
+                await Promise.race(executing);
+            }
+        }
+        return Promise.all(results);
+    }
+
+    async function loadChatsBatch(charge=false) {
+        const chatList = document.querySelector('.chat-list');
+        let chatHTML = ''; // Variable para acumular el HTML
+
+        // Obtener los siguientes 30 chats desde la posición actual (offset)
+        const nextChats = chats.slice(offset, offset + limit);
+
+        // Crear un array de funciones de promesas para obtener las imágenes de perfil en paralelo
+        const profilePicPromises = nextChats.map(chat => async () => {
+
+            if(!chat.profilePicData){
+                const profilePicResponse = await fetch('http://localhost:3000/contact/getProfilePicUrl/ABCD', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ contactId: chat.id._serialized })
+                });
+                const profilePicData = await profilePicResponse.json();
+                chat.profilePicData = profilePicData.result || 'default.jpg';
+            }
+            return { chat, profilePicUrl: chat.profilePicData };
+        });
+
+        // Limitar las solicitudes concurrentes a 5
+        const chatsWithProfilePics = await limitConcurrent(profilePicPromises, 5);
+
+        // Generar el HTML para cada chat con su imagen de perfil
+        chatsWithProfilePics.forEach(({ chat, profilePicUrl }) => {
+            chatHTML += `
+            <div class="chat-box" data-chat-name="${chat.name}" data-chat-id="${chat.id._serialized}">
+                <div class="img-box">
+                    <img class="img-cover" src="${profilePicUrl}" alt="Imagen de perfil">
+                </div>
+                <div class="chat-details">
+                    <div class="text-head">
+                        <h4>${chat.name || 'Desconocido'}</h4>
+                        <p class="time unread"></p>
+                    </div>
+                    <div class="text-message">
+                        <p>${chat.lastMessage ? truncateWords(chat.lastMessage.body, 6) : 'Sin mensajes recientes'}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        });
+        if(charge){
+            chatList.innerHTML = chatHTML;
+        }else{
+
+            chatList.insertAdjacentHTML('beforeend', chatHTML);
+
+            if(offset===0){
+                const chatBox = document.querySelector(".chat-list .chat-box");
+                if (chatBox) {
+                    const chatId = chatBox.dataset.chatId;
+                    const name = chatBox.dataset.chatName;
+                    await eventClickProfile(chatId, name, chatBox);
+                }
+            }
+            // Añadir los nuevos chats al contenedor
+        }
+        // Incrementar el offset para la próxima carga de chats
+        offset += limit;
+    }
+
+    // Función para detectar si se ha llegado al final del scroll de la lista de chats
+    function handleScroll() {
+        const chatList = document.querySelector('.chat-list');
+        if (chatList.scrollTop + chatList.clientHeight >= chatList.scrollHeight) {
+            loadChatsBatch(); // Cargar el siguiente lote de 30 chats
+        }
+    }
+
+    function throttle(func, limit) {
+        let lastFunc;
+        let lastRan;
+        return function() {
+            const context = this;
+            const args = arguments;
+            if (!lastRan) {
+                func.apply(context, args);
+                lastRan = Date.now();
+            } else {
+                clearTimeout(lastFunc);
+                lastFunc = setTimeout(function() {
+                    if (Date.now() - lastRan >= limit) {
+                        func.apply(context, args);
+                        lastRan = Date.now();
+                    }
+                }, limit - (Date.now() - lastRan));
+            }
+        };
+    }
+
+
+    var loadChatId = null;
+    // Función para cargar mensajes desde el backend
+    async function loadMessages(chatId) {
+        const chatContainer = document.getElementById('chat-container');
+        const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop === chatContainer.clientHeight;
+
+        // Encontrar el chat correspondiente por su chatId
+        const chat = chats.find(c => c.id._serialized === chatId);
+
+        // Verificar si los mensajes ya fueron cargados previamente
+        if (chat && chat.messages) {
+            renderMessages(chat.messages); // Renderizar los mensajes guardados localmente
+            return;
+        }
+
+        try {
+            // Realizar la petición inicial para obtener 50 mensajes
+            const response = await fetch('http://localhost:3000/chat/fetchMessages/ABCD', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ chatId, searchOptions: { limit: 1000 } }) // Obtener los primeros 50 mensajes
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                const messages = data.messages;
+                chat.messages = messages;
+                renderMessages(messages);
+
+                if (isAtBottom) {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+
+                // Ejecutar la consulta con `Infinity` en segundo plano
+                /**setTimeout(async () => {
+                    try {
+                        const allMessagesResponse = await fetch('http://localhost:3000/chat/fetchMessages/ABCD', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ chatId, searchOptions: { limit: 99999999 } }) // Obtener todos los mensajes
+                        });
+
+                        const allMessagesData = await allMessagesResponse.json();
+
+                        if (allMessagesData.success) {
+                            const allMessages = allMessagesData.messages;
+
+                            // Guardar los mensajes directamente dentro del objeto del chat
+                            chat.messages = allMessages;
+
+                            // Actualizar el renderizado de los mensajes
+                            renderMessages(allMessages);
+
+                            // Si el usuario estaba al final del chat, hacer scroll hasta abajo
+                            if (isAtBottom) {
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error al cargar todos los mensajes en segundo plano:', error);
+                    }
+                }, 5000);*/ // Ejecutar la tarea en segundo plano sin bloquear el hilo principal
+            }
+        } catch (error) {
+            console.error('Error al cargar los mensajes:', error);
+        }
+    }
+
+    // Función para renderizar los mensajes en el contenedor
+    function renderMessages(messages) {
+        const chatContainer = document.getElementById('chat-container');
+        chatContainer.innerHTML = ''; // Limpiar el contenedor antes de añadir mensajes
+
+        messages.forEach(message => {
+            const messageBox = document.createElement('div');
+            messageBox.className = message.fromMe ? 'message-box my-message' : 'message-box friend-message';
+
+            const messageContent = document.createElement('p');
+            messageContent.innerHTML = message.body
+                ? `${message.body}<br><span>${new Date(message.timestamp * 1000).toLocaleDateString()} ${new Date(message.timestamp * 1000).toLocaleTimeString()}</span>`
+                : 'Multimedia'; // Manejar mensajes multimedia si no hay texto
+
+
+            messageBox.appendChild(messageContent);
+
+            // Añadir el mensaje al contenedor del chat
+            chatContainer.appendChild(messageBox);
+        });
+    }
+
+
+    // Función que se ejecuta cuando se hace clic en un chat
+    async function handleChatClick(event) {
+
+        const chatBox = event.currentTarget; // El elemento .chat-box que fue clicado
+        const chatId = chatBox.dataset.chatId;
+        const name = chatBox.dataset.chatName;// Obtener el ID del chat desde un atributo data
+        await eventClickProfile(chatId, name, chatBox);
+    }
+
+    async function eventClickProfile(chatId,name, chatBox){
+
+        const chatContainer = document.getElementById('chat-container');
+        const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop === chatContainer.clientHeight;
+
+
+        console.log(`Se hizo clic en el chat con ID: ${chatId}`);
+
+        // Aquí accedemos al `profilePicUrl` que ya has cargado y asignamos la nueva imagen
+        const profilePicUrl = chatBox.querySelector('img.img-cover').src; // Obtener la URL de la imagen de perfil del chat clicado
+
+        // Cambiar la imagen de la foto de perfil
+        const userImg = document.querySelector('#img-profile'); // Seleccionamos la imagen del perfil
+        userImg.src = profilePicUrl;
+
+        // Actualizamos el contenido del contenedor con la imagen y el texto
+        document.querySelector("#name-profile").innerHTML = `<h4 id="name-profile">${name}<br><span>Online</span></h4>`;
+
+        // Limpiar el contenedor de mensajes
+
+
+        // Cargar los mensajes del chat seleccionado
+        document.getElementById('chat-container').innerHTML = '';
+        await loadMessages(chatId);
+        loadChatId = chatId;
+
+        if (isAtBottom) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    }
+
+
+    // Función para enviar el mensaje y mostrarlo en el chat
+    // Función para enviar el mensaje y mostrarlo en el chat
+    async function sendMessage(chatId, messageText) {
+        const chatContainer = document.getElementById('chat-container');
+
+        // Crear el mensaje en la interfaz
+        const myMessageBox = document.createElement('div');
+        myMessageBox.className = 'message-box my-message';
+        const myMessageContent = document.createElement('p');
+        myMessageContent.innerHTML = `${messageText}<br><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</span>`;
+        myMessageBox.appendChild(myMessageContent);
+        chatContainer.appendChild(myMessageBox); // Mostrar el mensaje
+        myMessageBox.scrollIntoView({ behavior: 'smooth' });
+
+        // Mover el chat a la parte superior de la lista de chats
+        const chatBox = document.querySelector(`.chat-box[data-chat-id="${chatId}"]`);
+        const chatList = document.querySelector('.chat-list');
+        if (chatBox && chatList) {
+            chatList.prepend(chatBox);
+            chatBox.querySelector(".text-message").innerHTML =`<p>${truncateWords(messageText, 6)}</p>`
+        }
+        // Enviar el mensaje al servidor
+        try {
+            await fetch('http://localhost:3000/client/sendMessage/ABCD', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatId, content: messageText, contentType: "string" })
+            });
+
+        } catch (error) {
+            console.error('Error al enviar el mensaje:', error);
+        }
+    }
+
+
+    // Detectar cuando el usuario escribe y pulsa Enter
+    document.querySelector('.chatbox-input input').addEventListener('keyup', function(event) {
+        if (event.key === 'Enter' && this.value.trim() !== '') {
+            const messageText = this.value.trim();
+            const chatId = loadChatId; // Obtener el chatId actual
+            sendMessage(chatId, messageText);
+            this.value = ''; // Limpiar el campo de entrada
+        }
+    });
+
+
+    // Asignar el evento de click a cada elemento con la clase .chat-box
+    function assignClickEvents() {
+        const chatBoxes = document.querySelectorAll('.chat-box');
+        chatBoxes.forEach(chatBox => {
+            chatBox.addEventListener('click', handleChatClick);
+        });
+    }
+
+
+    // Usar throttle en el evento scroll
+    const chatList = document.querySelector('.chat-list');
+    chatList.addEventListener('scroll', throttle(handleScroll, 200));
+
+
+
+
+    // Cargar los chats al inicio
+    window.onload = async  function() {
+        await loadInitialChats();
+        assignClickEvents();
+    };
+
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "pruebas",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@types/qrcode-terminal": "^0.12.2",
+    "axios": "^1.7.3",
+    "express": "^4.19.2",
+    "qrcode-terminal": "^0.12.0",
+    "socket.io-client": "^4.7.5",
+    "whatsapp-web.js": "^1.25.0",
+    "ws": "^8.18.0"
+  }
+}
